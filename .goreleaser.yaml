@@ -7,13 +7,24 @@ before:
     - go test ./...
 
 builds:
-  - id: tmswitch
+  - id: tmswitch-darwin
     main: .
     binary: tmswitch
     env:
       - CGO_ENABLED=0
     goos:
       - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.appVersion={{ .Version }}
+  - id: tmswitch-linux
+    main: .
+    binary: tmswitch
+    env:
+      - CGO_ENABLED=0
+    goos:
       - linux
     goarch:
       - amd64
@@ -22,9 +33,21 @@ builds:
       - -s -w -X main.appVersion={{ .Version }}
 
 archives:
-  - id: default
+  - id: darwin-archive
     ids:
-      - tmswitch
+      - tmswitch-darwin
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+  - id: linux-archive
+    ids:
+      - tmswitch-linux
     formats:
       - tar.gz
     name_template: >-
@@ -46,10 +69,12 @@ release:
     owner: devopshouse
     name: tmswitch
 
-brews:
+homebrew_casks:
   - name: tmswitch
     ids:
-      - default
+      - darwin-archive
+    binaries:
+      - tmswitch
     repository:
       owner: devopshouse
       name: homebrew-tap
@@ -58,8 +83,11 @@ brews:
     homepage: https://github.com/devopshouse/tmswitch
     description: Switch between different versions of Terramate
     license: MIT
-    directory: Formula
-    install: |
-      bin.install "tmswitch"
-    test: |
-      assert_match "tmswitch version:", shell_output("#{bin}/tmswitch --version")
+    url:
+      verified: github.com/devopshouse/tmswitch/
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tmswitch"]
+          end

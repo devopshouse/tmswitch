@@ -21,18 +21,20 @@ go install github.com/devopshouse/tmswitch@latest
 
 ### Homebrew
 
-Once releases are configured, install with:
+On macOS, install with:
 
 ```bash
 brew tap devopshouse/tap
-brew install tmswitch
+brew install --cask tmswitch
 ```
 
 Or in a single command:
 
 ```bash
-brew install devopshouse/tap/tmswitch
+brew install --cask devopshouse/tap/tmswitch
 ```
+
+Homebrew publishing uses a cask, which is the current GoReleaser-supported path for distributing prebuilt binaries.
 
 Or build from source:
 
@@ -173,9 +175,9 @@ The release workflow in [.github/workflows/release.yml](/Users/xjulio/git/tmswit
 1. Run the test suite.
 2. Build release archives for macOS and Linux.
 3. Publish a GitHub Release.
-4. Update the Homebrew formula in `devopshouse/homebrew-tap`.
+4. Update the Homebrew cask in `devopshouse/homebrew-tap`.
 
 Notes:
 
-- The Homebrew publishing uses a formula tap in [.goreleaser.yaml](/Users/xjulio/git/tmswitch/.goreleaser.yaml), which keeps the install UX close to `tfswitch`.
-- GoReleaser now considers Homebrew formulas a legacy path in favor of casks, but formulas are still the better fit for a CLI tool like `tmswitch`.
+- The Homebrew publishing uses `homebrew_casks` in [.goreleaser.yaml](/Users/xjulio/git/tmswitch/.goreleaser.yaml), which is the current GoReleaser-supported replacement for deprecated `brews`.
+- The Homebrew install command is `brew install --cask devopshouse/tap/tmswitch`.
