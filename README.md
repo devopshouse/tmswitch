@@ -6,7 +6,7 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/devopshouse/tmswitch/total)
 ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/devopshouse/tmswitch/latest/total)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/devopshouse/tmswitch)
-[![Go Report Card](https://goreportcard.com/badge/github.com/devopshouse/tmswitch?v=20260320)](https://goreportcard.com/report/github.com/devopshouse/tmswitch)
+[![Go Report Card](https://goreportcard.com/badge/github.com/devopshouse/tmswitch)](https://goreportcard.com/report/github.com/devopshouse/tmswitch)
 
 ## Terramate Switcher
 
