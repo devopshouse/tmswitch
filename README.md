@@ -42,6 +42,8 @@ Prebuilt release archives are published for:
 curl -L https://raw.githubusercontent.com/devopshouse/tmswitch/main/install.sh | bash
 ```
 
+The installer prefers `~/.local/bin` and falls back to `sudo` only if it needs to place the binary in a protected directory.
+
 ### Linux / macOS (from source)
 
 ```bash

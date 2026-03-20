@@ -3,7 +3,9 @@
 set -euo pipefail
 
 REPO="devopshouse/tmswitch"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+DEFAULT_INSTALL_DIR="$HOME/.local/bin"
+FALLBACK_INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -66,8 +68,14 @@ fi
 
 chmod +x "$tmpdir/tmswitch"
 
+mkdir -p "$INSTALL_DIR"
+
 if [[ -w "$INSTALL_DIR" ]]; then
   mv "$tmpdir/tmswitch" "$INSTALL_DIR/tmswitch"
+elif [[ "${INSTALL_DIR}" == "${DEFAULT_INSTALL_DIR}" ]]; then
+  mkdir -p "$FALLBACK_INSTALL_DIR"
+  sudo mv "$tmpdir/tmswitch" "$FALLBACK_INSTALL_DIR/tmswitch"
+  INSTALL_DIR="$FALLBACK_INSTALL_DIR"
 else
   sudo mv "$tmpdir/tmswitch" "$INSTALL_DIR/tmswitch"
 fi
