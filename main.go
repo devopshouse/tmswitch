@@ -106,50 +106,15 @@ func main() {
 	}
 
 	homedir := lib.GetHomeDirectory()
-	if *listAllFlag {
-		printVersionList(true)
-		return
-	}
-	if *showLatestFlag {
-		version, err := latestVersion(false)
-		if err != nil {
-			log.Fatalf("Failed to resolve latest terramate version: %v", err)
-		}
-		fmt.Println(version)
-		return
-	}
-	if *latestPreFlag != "" {
-		version, err := latestMatchingVersion(*latestPreFlag, true)
-		if err != nil {
-			log.Fatalf("Failed to resolve latest pre-release terramate version: %v", err)
-		}
-		binPath := *custBinPath
-		installVersion(version, &binPath)
-		return
-	}
-	if *showLatestPreFlag != "" {
-		version, err := latestMatchingVersion(*showLatestPreFlag, true)
-		if err != nil {
-			log.Fatalf("Failed to resolve latest pre-release terramate version: %v", err)
-		}
-		fmt.Println(version)
-		return
-	}
-	if *latestStableFlag != "" {
-		version, err := latestMatchingVersion(*latestStableFlag, false)
-		if err != nil {
-			log.Fatalf("Failed to resolve latest stable terramate version: %v", err)
-		}
-		binPath := *custBinPath
-		installVersion(version, &binPath)
-		return
-	}
-	if *showLatestStableFlag != "" {
-		version, err := latestMatchingVersion(*showLatestStableFlag, false)
-		if err != nil {
-			log.Fatalf("Failed to resolve latest stable terramate version: %v", err)
-		}
-		fmt.Println(version)
+	if handleImmediateActions(immediateActions{
+		binPath:          *custBinPath,
+		listAll:          *listAllFlag,
+		showLatest:       *showLatestFlag,
+		latestPre:        *latestPreFlag,
+		showLatestPre:    *showLatestPreFlag,
+		latestStable:     *latestStableFlag,
+		showLatestStable: *showLatestStableFlag,
+	}) {
 		return
 	}
 
@@ -165,6 +130,60 @@ func main() {
 	if interactive {
 		selectVersionInteractive(&binPath, *preFlag)
 		return
+	}
+	installVersion(version, &binPath)
+}
+
+type immediateActions struct {
+	binPath          string
+	listAll          bool
+	showLatest       bool
+	latestPre        string
+	showLatestPre    string
+	latestStable     string
+	showLatestStable string
+}
+
+func handleImmediateActions(actions immediateActions) bool {
+	switch {
+	case actions.listAll:
+		printVersionList(true)
+		return true
+	case actions.showLatest:
+		version, err := latestVersion(false)
+		printResolvedVersion(version, err, "latest terramate")
+		return true
+	case actions.latestPre != "":
+		version, err := latestMatchingVersion(actions.latestPre, true)
+		installResolvedVersion(actions.binPath, version, err, "latest pre-release terramate")
+		return true
+	case actions.showLatestPre != "":
+		version, err := latestMatchingVersion(actions.showLatestPre, true)
+		printResolvedVersion(version, err, "latest pre-release terramate")
+		return true
+	case actions.latestStable != "":
+		version, err := latestMatchingVersion(actions.latestStable, false)
+		installResolvedVersion(actions.binPath, version, err, "latest stable terramate")
+		return true
+	case actions.showLatestStable != "":
+		version, err := latestMatchingVersion(actions.showLatestStable, false)
+		printResolvedVersion(version, err, "latest stable terramate")
+		return true
+	default:
+		return false
+	}
+}
+
+func printResolvedVersion(version string, err error, label string) {
+	if err != nil {
+		log.Fatalf("Failed to resolve %s version: %v", label, err)
+	}
+	fmt.Println(version)
+}
+
+func installResolvedVersion(binPath string, version string, err error, label string) {
+	if err != nil {
+		log.Fatalf("Failed to resolve %s version: %v", label, err)
 	}
 	installVersion(version, &binPath)
 }
@@ -306,7 +325,10 @@ func selectVersionInteractive(binPath *string, includePrerelease bool) {
 	}
 
 	// Prepend recently used versions for convenience.
-	recent, _ := lib.GetRecentVersions()
+	recent, err := lib.GetRecentVersions()
+	if err != nil {
+		log.Printf("Warning: failed to load recent terramate versions: %v", err)
+	}
 	var displayList []string
 	displayList = append(displayList, recent...)
 	for _, v := range versions {
