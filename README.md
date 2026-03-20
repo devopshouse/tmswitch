@@ -83,9 +83,9 @@ Recently used versions are shown at the top of the list for convenience.
 tmswitch 0.16.0
 ```
 
-### Include pre-release versions
+### Include prerelease versions
 
-Pass the `--pre` flag to also show release candidates and other pre-release versions:
+Pass the `--pre` flag to also show release candidates and other prerelease versions:
 
 ```bash
 tmswitch --pre
@@ -107,11 +107,11 @@ These flags are modeled after the `tfswitch` UX:
 
 - `--latest` installs the newest stable release
 - `--show-latest` prints the newest stable release
-- `--latest-pre <prefix>` installs the newest matching pre-release
-- `--show-latest-pre <prefix>` prints the newest matching pre-release
+- `--latest-pre <prefix>` installs the newest matching prerelease
+- `--show-latest-pre <prefix>` prints the newest matching prerelease
 - `--latest-stable <prefix>` installs the newest matching stable release
 - `--show-latest-stable <prefix>` prints the newest matching stable release
-- `--list-all` prints all available releases, including pre-releases
+- `--list-all` prints all available releases, including prereleases
 
 ### Use a version file
 
@@ -181,17 +181,17 @@ tmswitch --mirror https://github.com/terramate-io/terramate --latest
 ## Options
 
 | Flag | Short | Description |
-|------|-------|-------------|
+| ---- | ----- | ----------- |
 | `--bin <path>` | `-b` | Custom install path for the terramate symlink |
 | `--chdir <dir>` | `-c` | Look for version/config files in a different directory |
-| `--pre` | `-p` | Include pre-release versions in the selector |
+| `--pre` | `-p` | Include prerelease versions in the selector |
 | `--version` | `-v` | Display tmswitch version |
 | `--help` | `-h` | Display help message |
 
 Environment variables:
 
 | Variable | Description |
-|----------|-------------|
+| -------- | ----------- |
 | `TM_VERSION` | Explicit Terramate version override |
 | `TM_DEFAULT_VERSION` | Fallback Terramate version |
 | `TM_BINARY_PATH` | Override binary install path unless `--bin` is provided |
@@ -199,14 +199,14 @@ Environment variables:
 Additional tfswitch-style flags:
 
 | Flag | Description |
-|------|-------------|
+| ---- | ----------- |
 | `--latest` | Install latest stable version |
 | `--show-latest` | Print latest stable version |
-| `--latest-pre <prefix>` | Install latest matching pre-release |
-| `--show-latest-pre <prefix>` | Print latest matching pre-release |
+| `--latest-pre <prefix>` | Install latest matching prerelease |
+| `--show-latest-pre <prefix>` | Print latest matching prerelease |
 | `--latest-stable <prefix>` | Install latest matching stable version |
 | `--show-latest-stable <prefix>` | Print latest matching stable version |
-| `--list-all` | Print all versions, including pre-releases |
+| `--list-all` | Print all versions, including prereleases |
 | `--default <version>` | Fallback version when no other source exists |
 | `--dry-run` | Show actions without downloading or switching |
 | `--install <dir>` | Root path used for `.terramate.versions` |
@@ -226,7 +226,7 @@ Additional tfswitch-style flags:
 3. Downloads the versioned binary from GitHub and stores it in `~/.terramate.versions/`.
 4. Creates (or updates) a symlink at `/usr/local/bin/terramate` (or your custom path).
 
-Previously downloaded versions are cached locally and re-used without re-downloading.
+Previously downloaded versions are cached locally and reused without redownloading.
 
 ---
 
