@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	lib "github.com/devopshouse/tmswitch/lib"
 )
 
 func TestResolveInstallRequest_PrioritizesArgOverConfig(t *testing.T) {
@@ -230,6 +232,25 @@ func TestResolveInstallRequest_CLIBinPathOverridesEnvBinPath(t *testing.T) {
 	}
 }
 
+func TestResolveInstallRequest_UsesCLIDefaultBeforeEnvAndTOMLDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	mustMkdirAll(t, homeDir)
+	mustMkdirAll(t, projectDir)
+	mustWriteFile(t, filepath.Join(projectDir, tomlFilename), "default-version = \"0.16.0\"\n")
+	t.Setenv(envDefault, "0.17.0")
+
+	version, _, interactive := resolveInstallRequestWithDefault(nil, projectDir, homeDir, "/usr/local/bin/terramate", "0.18.0")
+
+	if interactive {
+		t.Fatal("expected non-interactive install request")
+	}
+	if version != "0.18.0" {
+		t.Fatalf("expected CLI default version to win, got %q", version)
+	}
+}
+
 func TestResolveInstallRequest_FallsBackToInteractive(t *testing.T) {
 	tmpDir := t.TempDir()
 	homeDir := filepath.Join(tmpDir, "home")
@@ -295,6 +316,65 @@ func TestValidateRequestedVersion_ReturnsWarningOnLookupFailure(t *testing.T) {
 	}
 	if version != "0.16.0" {
 		t.Fatalf("expected original version to be preserved, got %q", version)
+	}
+}
+
+func TestLatestVersion_ReturnsNewestStable(t *testing.T) {
+	version, err := lib.LatestVersion([]string{"0.16.2", "0.16.1", "0.16.0"})
+	if err != nil {
+		t.Fatalf("LatestVersion: %v", err)
+	}
+	if version != "0.16.2" {
+		t.Fatalf("expected 0.16.2, got %q", version)
+	}
+}
+
+func TestLatestMatchingVersion_StablePrefix(t *testing.T) {
+	version, err := lib.LatestMatchingVersion([]string{"0.16.2", "0.16.1", "0.15.9"}, "0.16")
+	if err != nil {
+		t.Fatalf("LatestMatchingVersion: %v", err)
+	}
+	if version != "0.16.2" {
+		t.Fatalf("expected 0.16.2, got %q", version)
+	}
+}
+
+func TestLatestMatchingVersion_PrereleasePrefix(t *testing.T) {
+	version, err := lib.LatestMatchingVersion([]string{"0.17.0-rc2", "0.17.0-rc1", "0.16.2"}, "0.17")
+	if err != nil {
+		t.Fatalf("LatestMatchingVersion: %v", err)
+	}
+	if version != "0.17.0-rc2" {
+		t.Fatalf("expected 0.17.0-rc2, got %q", version)
+	}
+}
+
+func TestLatestMatchingVersion_ExactVersion(t *testing.T) {
+	version, err := lib.LatestMatchingVersion([]string{"0.17.0-rc2", "0.16.2"}, "0.16.2")
+	if err != nil {
+		t.Fatalf("LatestMatchingVersion: %v", err)
+	}
+	if version != "0.16.2" {
+		t.Fatalf("expected 0.16.2, got %q", version)
+	}
+}
+
+func TestDeriveMirrorURLs_FromRepoURL(t *testing.T) {
+	apiURL, downloadURL, err := deriveMirrorURLs("https://github.com/example/terramate")
+	if err != nil {
+		t.Fatalf("deriveMirrorURLs: %v", err)
+	}
+	if apiURL != "https://api.github.com/repos/example/terramate/releases?per_page=100" {
+		t.Fatalf("unexpected api URL: %q", apiURL)
+	}
+	if downloadURL != "https://github.com/example/terramate/releases/download/" {
+		t.Fatalf("unexpected download URL: %q", downloadURL)
+	}
+}
+
+func TestDeriveMirrorURLs_Invalid(t *testing.T) {
+	if _, _, err := deriveMirrorURLs("https://example.com/releases"); err == nil {
+		t.Fatal("expected invalid mirror error")
 	}
 }
 

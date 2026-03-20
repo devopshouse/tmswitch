@@ -1,0 +1,20 @@
+name: Update Go Module Index
+
+on:
+  release:
+    types:
+      - published
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  bump-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Ping endpoint
+        run: curl "https://proxy.golang.org/github.com/devopshouse/tmswitch/@v/$(git describe HEAD --tags --abbrev=0).info"

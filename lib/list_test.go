@@ -16,11 +16,11 @@ func TestValidVersionFormat(t *testing.T) {
 		{"1.0.0", true},
 		{"0.16.0-rc1", true},
 		{"0.16.0-beta1", true},
-		{"v0.16.0", false},   // has leading 'v'
-		{"0.16", false},      // only two parts
-		{"abc", false},       // not numeric
-		{"0.16.0.1", false},  // four parts
-		{"", false},          // empty
+		{"v0.16.0", false},  // has leading 'v'
+		{"0.16", false},     // only two parts
+		{"abc", false},      // not numeric
+		{"0.16.0.1", false}, // four parts
+		{"", false},         // empty
 	}
 
 	for _, tt := range tests {
@@ -88,5 +88,35 @@ func TestGetVersionListFromURL_HTTPError(t *testing.T) {
 	_, err := getVersionListFromURL(srv.URL, false)
 	if err == nil {
 		t.Error("expected an error on non-200 status, got nil")
+	}
+}
+
+func TestLatestVersion(t *testing.T) {
+	got, err := LatestVersion([]string{"0.16.0", "0.15.5"})
+	if err != nil {
+		t.Fatalf("LatestVersion: %v", err)
+	}
+	if got != "0.16.0" {
+		t.Fatalf("expected 0.16.0, got %q", got)
+	}
+}
+
+func TestLatestMatchingVersion(t *testing.T) {
+	got, err := LatestMatchingVersion([]string{"0.16.1", "0.16.0", "0.15.9"}, "0.16")
+	if err != nil {
+		t.Fatalf("LatestMatchingVersion: %v", err)
+	}
+	if got != "0.16.1" {
+		t.Fatalf("expected 0.16.1, got %q", got)
+	}
+}
+
+func TestLatestMatchingVersion_Prerelease(t *testing.T) {
+	got, err := LatestMatchingVersion([]string{"0.17.0-rc2", "0.17.0-rc1", "0.16.0"}, "0.17")
+	if err != nil {
+		t.Fatalf("LatestMatchingVersion: %v", err)
+	}
+	if got != "0.17.0-rc2" {
+		t.Fatalf("expected 0.17.0-rc2, got %q", got)
 	}
 }

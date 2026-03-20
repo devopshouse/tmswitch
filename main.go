@@ -20,9 +20,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/manifoldco/promptui"
@@ -33,28 +35,47 @@ import (
 )
 
 const (
-	defaultBin   = "/usr/local/bin/terramate"
-	rcFilename   = ".tmswitchrc"
-	tmvFilename  = ".terramate-version"
-	tomlFilename = ".tmswitch.toml"
-	envVersion   = "TM_VERSION"
-	envDefault   = "TM_DEFAULT_VERSION"
-	envBinPath   = "TM_BINARY_PATH"
+	defaultBin     = "/usr/local/bin/terramate"
+	rcFilename     = ".tmswitchrc"
+	tmvFilename    = ".terramate-version"
+	tomlFilename   = ".tmswitch.toml"
+	envVersion     = "TM_VERSION"
+	envDefault     = "TM_DEFAULT_VERSION"
+	envBinPath     = "TM_BINARY_PATH"
+	defaultProduct = "terramate"
 )
 
 var appVersion = "dev"
+var currentInstallOptions lib.InstallOptions
+var currentReleaseAPIURL string
 
 func main() {
 	dir := lib.GetCurrentDirectory()
 
+	archFlag := getopt.StringLong("arch", 'A', runtime.GOARCH, "Override CPU architecture type for downloaded binary")
 	custBinPath := getopt.StringLong("bin", 'b',
 		lib.ConvertExecutableExt(defaultBin),
 		"Custom binary path. Ex: tmswitch -b /home/user/bin/terramate")
+	defaultVersionFlag := getopt.StringLong("default", 'd', "", "Default to this version in case no other versions could be detected")
+	logLevelFlag := getopt.StringLong("log-level", 'g', "INFO", "Set tmswitch logging level")
+	installPathFlag := getopt.StringLong("install", 'i', "", "Custom install path")
+	forceColorFlag := getopt.BoolLong("force-color", 'K', "Force color output if terminal supports it")
+	noColorFlag := getopt.BoolLong("no-color", 'k', "Disable color output")
+	latestFlag := getopt.BoolLong("latest", 'u', "Get latest stable version")
+	listAllFlag := getopt.BoolLong("list-all", 'l', "List all versions, including beta and RC versions")
+	showLatestFlag := getopt.BoolLong("show-latest", 'U', "Show latest stable version")
+	latestPreFlag := getopt.StringLong("latest-pre", 'p', "", "Latest pre-release implicit version")
+	showLatestPreFlag := getopt.StringLong("show-latest-pre", 'P', "", "Show latest pre-release implicit version")
+	latestStableFlag := getopt.StringLong("latest-stable", 's', "", "Latest implicit stable version based on a prefix")
+	showLatestStableFlag := getopt.StringLong("show-latest-stable", 'S', "", "Show latest implicit stable version based on a prefix")
+	dryRunFlag := getopt.BoolLong("dry-run", 'r', "Only show what tmswitch would do. Don't download anything")
+	mirrorFlag := getopt.StringLong("mirror", 'm', "", "Install from a remote API other than the default")
+	productFlag := getopt.StringLong("product", 't', defaultProduct, "Specify which product to use")
 	versionFlag := getopt.BoolLong("version", 'v', "Display tmswitch version")
 	helpFlag := getopt.BoolLong("help", 'h', "Display help message")
 	chDirPath := getopt.StringLong("chdir", 'c', dir,
 		"Switch to a different working directory before executing")
-	preFlag := getopt.BoolLong("pre", 'p', "Include pre-release versions")
+	preFlag := getopt.BoolLong("pre", 0, "Include pre-release versions")
 
 	getopt.Parse()
 	args := getopt.Args()
@@ -69,8 +90,78 @@ func main() {
 		return
 	}
 
+	configureCLI(*logLevelFlag, *forceColorFlag, *noColorFlag, *productFlag)
+
+	releaseAPIURL, downloadBaseURL, err := deriveMirrorURLs(*mirrorFlag)
+	if err != nil {
+		log.Fatalf("Invalid mirror value: %v", err)
+	}
+	currentReleaseAPIURL = releaseAPIURL
+	currentInstallOptions = lib.InstallOptions{
+		Arch:            *archFlag,
+		BinPath:         *custBinPath,
+		DownloadBaseURL: downloadBaseURL,
+		DryRun:          *dryRunFlag,
+		InstallPath:     *installPathFlag,
+	}
+
 	homedir := lib.GetHomeDirectory()
-	version, binPath, interactive := resolveInstallRequest(args, *chDirPath, homedir, *custBinPath)
+	if *listAllFlag {
+		printVersionList(true)
+		return
+	}
+	if *showLatestFlag {
+		version, err := latestVersion(false)
+		if err != nil {
+			log.Fatalf("Failed to resolve latest terramate version: %v", err)
+		}
+		fmt.Println(version)
+		return
+	}
+	if *latestPreFlag != "" {
+		version, err := latestMatchingVersion(*latestPreFlag, true)
+		if err != nil {
+			log.Fatalf("Failed to resolve latest pre-release terramate version: %v", err)
+		}
+		binPath := *custBinPath
+		installVersion(version, &binPath)
+		return
+	}
+	if *showLatestPreFlag != "" {
+		version, err := latestMatchingVersion(*showLatestPreFlag, true)
+		if err != nil {
+			log.Fatalf("Failed to resolve latest pre-release terramate version: %v", err)
+		}
+		fmt.Println(version)
+		return
+	}
+	if *latestStableFlag != "" {
+		version, err := latestMatchingVersion(*latestStableFlag, false)
+		if err != nil {
+			log.Fatalf("Failed to resolve latest stable terramate version: %v", err)
+		}
+		binPath := *custBinPath
+		installVersion(version, &binPath)
+		return
+	}
+	if *showLatestStableFlag != "" {
+		version, err := latestMatchingVersion(*showLatestStableFlag, false)
+		if err != nil {
+			log.Fatalf("Failed to resolve latest stable terramate version: %v", err)
+		}
+		fmt.Println(version)
+		return
+	}
+
+	version, binPath, interactive := resolveInstallRequestWithDefault(args, *chDirPath, homedir, *custBinPath, *defaultVersionFlag)
+	if *latestFlag {
+		latest, err := latestVersion(false)
+		if err != nil {
+			log.Fatalf("Failed to resolve latest terramate version: %v", err)
+		}
+		installVersion(latest, &binPath)
+		return
+	}
 	if interactive {
 		selectVersionInteractive(&binPath, *preFlag)
 		return
@@ -89,6 +180,10 @@ type tomlConfig struct {
 // versions. If no version is resolved, interactive indicates that the selector
 // should be shown.
 func resolveInstallRequest(args []string, chDirPath, homedir, cliBinPath string) (string, string, bool) {
+	return resolveInstallRequestWithDefault(args, chDirPath, homedir, cliBinPath, "")
+}
+
+func resolveInstallRequestWithDefault(args []string, chDirPath, homedir, cliBinPath, cliDefaultVersion string) (string, string, bool) {
 	tomlConfigFile := filepath.Join(chDirPath, tomlFilename)
 	homeTOMLConfigFile := filepath.Join(homedir, tomlFilename)
 	rcFile := filepath.Join(chDirPath, rcFilename)
@@ -123,6 +218,8 @@ func resolveInstallRequest(args []string, chDirPath, homedir, cliBinPath string)
 		return lib.RetrieveFileContents(tmVersionFile), binPath, false
 	case cfg.Version != "":
 		return cfg.Version, binPath, false
+	case strings.TrimSpace(cliDefaultVersion) != "":
+		return strings.TrimSpace(cliDefaultVersion), binPath, false
 	case envDefaultVersion != "":
 		return envDefaultVersion, binPath, false
 	case cfg.DefaultVersion != "":
@@ -133,7 +230,7 @@ func resolveInstallRequest(args []string, chDirPath, homedir, cliBinPath string)
 }
 
 func installVersion(version string, binPath *string) {
-	version, warnErr, fatalErr := validateRequestedVersion(version, lib.GetVersionList)
+	version, warnErr, fatalErr := validateRequestedVersion(version, versionListFetcher())
 	if fatalErr != nil {
 		fmt.Println(fatalErr.Error())
 		usageMessage()
@@ -142,7 +239,9 @@ func installVersion(version string, binPath *string) {
 	if warnErr != nil {
 		fmt.Printf("Warning: could not fetch releases list (%v). Attempting install anyway.\n", warnErr)
 	}
-	lib.Install(version, *binPath)
+	options := currentInstallOptions
+	options.BinPath = *binPath
+	lib.InstallWithOptions(version, options)
 }
 
 func validateRequestedVersion(requested string, fetchVersions func(bool) ([]string, error)) (string, error, error) {
@@ -161,9 +260,43 @@ func validateRequestedVersion(requested string, fetchVersions func(bool) ([]stri
 	return version, nil, nil
 }
 
+func mustGetVersionList(includePrerelease bool) []string {
+	versions, err := versionListFetcher()(includePrerelease)
+	if err != nil {
+		log.Fatalf("Failed to fetch version list: %v", err)
+	}
+	if len(versions) == 0 {
+		log.Fatal("No terramate versions found.")
+	}
+	return versions
+}
+
+func printVersionList(includePrerelease bool) {
+	for _, version := range mustGetVersionList(includePrerelease) {
+		fmt.Println(version)
+	}
+}
+
+func latestVersion(includePrerelease bool) (string, error) {
+	return lib.LatestVersion(mustGetVersionList(includePrerelease))
+}
+
+func latestMatchingVersion(requested string, includePrerelease bool) (string, error) {
+	return lib.LatestMatchingVersion(mustGetVersionList(includePrerelease), requested)
+}
+
+func versionListFetcher() func(bool) ([]string, error) {
+	return func(includePrerelease bool) ([]string, error) {
+		if currentReleaseAPIURL != "" {
+			return lib.GetVersionListFromURL(currentReleaseAPIURL, includePrerelease)
+		}
+		return lib.GetVersionList(includePrerelease)
+	}
+}
+
 // selectVersionInteractive shows an interactive prompt to pick a version.
 func selectVersionInteractive(binPath *string, includePrerelease bool) {
-	versions, err := lib.GetVersionList(includePrerelease)
+	versions, err := versionListFetcher()(includePrerelease)
 	if err != nil {
 		log.Fatalf("Failed to fetch version list: %v", err)
 	}
@@ -196,7 +329,9 @@ func selectVersionInteractive(binPath *string, includePrerelease bool) {
 
 	// Strip the " *recent" marker if present.
 	version := strings.TrimSuffix(selected, " *recent")
-	lib.Install(version, *binPath)
+	options := currentInstallOptions
+	options.BinPath = *binPath
+	lib.InstallWithOptions(version, options)
 }
 
 // readTOMLConfig reads the .tmswitch.toml configuration file from the given
@@ -225,6 +360,53 @@ func readTOMLConfig(binPath, dir string) tomlConfig {
 	}
 }
 
+func configureCLI(logLevel string, forceColor, noColor bool, product string) {
+	if forceColor && noColor {
+		log.Fatal("Cannot force color and disable color at the same time")
+	}
+	if forceColor {
+		os.Setenv("FORCE_COLOR", "true")
+	}
+	if noColor {
+		os.Setenv("NO_COLOR", "true")
+	}
+
+	if strings.EqualFold(logLevel, "OFF") {
+		log.SetOutput(io.Discard)
+	}
+
+	if product == "" {
+		return
+	}
+	if product != defaultProduct {
+		log.Fatalf("Unsupported product %q. Only %q is currently supported.", product, defaultProduct)
+	}
+}
+
+func deriveMirrorURLs(mirror string) (string, string, error) {
+	mirror = strings.TrimSpace(mirror)
+	if mirror == "" {
+		return "", "", nil
+	}
+
+	switch {
+	case strings.Contains(mirror, "api.github.com/repos/") && strings.Contains(mirror, "/releases"):
+		base := strings.TrimPrefix(mirror, "https://api.github.com/repos/")
+		base = strings.SplitN(base, "/releases", 2)[0]
+		return mirror, "https://github.com/" + base + "/releases/download/", nil
+	case strings.Contains(mirror, "github.com/") && strings.Contains(mirror, "/releases/download/"):
+		base := strings.TrimPrefix(mirror, "https://github.com/")
+		base = strings.SplitN(base, "/releases/download/", 2)[0]
+		return "https://api.github.com/repos/" + base + "/releases?per_page=100", mirror, nil
+	case strings.Contains(mirror, "github.com/"):
+		base := strings.TrimPrefix(mirror, "https://github.com/")
+		base = strings.TrimSuffix(base, "/")
+		return "https://api.github.com/repos/" + base + "/releases?per_page=100", "https://github.com/" + base + "/releases/download/", nil
+	default:
+		return "", "", fmt.Errorf("unsupported mirror %q: expected a GitHub repository, API releases URL, or releases/download base URL", mirror)
+	}
+}
+
 func usageMessage() {
 	fmt.Print(`
 tmswitch - Switch between different versions of terramate
@@ -232,9 +414,26 @@ tmswitch - Switch between different versions of terramate
 Usage:
   tmswitch                        Interactive version selector
   tmswitch <version>              Install a specific version (e.g. tmswitch 0.16.0)
+  tmswitch --latest               Install the latest stable version
+  tmswitch --show-latest          Print the latest stable version
+  tmswitch --latest-pre <prefix>  Install the latest matching pre-release version
+  tmswitch --show-latest-pre <p>  Print the latest matching pre-release version
+  tmswitch --latest-stable <p>    Install the latest matching stable version
+  tmswitch --show-latest-stable <p>
+                                   Print the latest matching stable version
+  tmswitch --list-all             Print all versions, including pre-releases
   tmswitch --pre                  Include pre-release versions in the selector
+  tmswitch --dry-run              Only show what tmswitch would do
+  tmswitch --default <version>    Fallback version when no other source exists
+  tmswitch --arch <arch>          Override CPU architecture for downloads
   tmswitch --bin <path>           Custom install path for the terramate binary
   tmswitch --chdir <dir>          Look for version files in a different directory
+  tmswitch --install <dir>        Root path for .terramate.versions
+  tmswitch --mirror <url>         GitHub repo/API/download base override
+  tmswitch --product terramate    Product selector (currently terramate only)
+  tmswitch --force-color          Force color output if terminal supports it
+  tmswitch --no-color             Disable color output
+  tmswitch --log-level <level>    Set log level (OFF suppresses stdlib logs)
   tmswitch --version              Display tmswitch version
   tmswitch --help                 Display this help message
 
@@ -245,6 +444,24 @@ Version files (in order of precedence):
   TM_DEFAULT_VERSION              Environment fallback version
   .tmswitch.toml                  TOML file with optional 'version', 'default-version', and 'bin' keys
   TM_BINARY_PATH                  Environment override for the Terramate binary path
+
+Flags:
+  -A, --arch <arch>               Override CPU architecture for downloads
+  -d, --default <version>         Fallback version when no other source exists
+  -g, --log-level <level>         Set log level (OFF disables stdlib logs)
+  -l, --list-all                  List all versions, including beta and RC versions
+  -m, --mirror <url>              Override GitHub repo/API/download base
+  -p, --latest-pre <prefix>       Install latest matching pre-release version
+  -P, --show-latest-pre <prefix>  Print latest matching pre-release version
+  -r, --dry-run                   Only show what tmswitch would do
+  -s, --latest-stable <prefix>    Install latest matching stable version
+  -S, --show-latest-stable <p>    Print latest matching stable version
+  -t, --product terramate         Product selector (currently terramate only)
+  -u, --latest                    Get latest stable version
+  -U, --show-latest               Show latest stable version
+  -i, --install <dir>             Root path for .terramate.versions
+  -K, --force-color               Force color output if terminal supports it
+  -k, --no-color                  Disable color output
 
 `)
 }

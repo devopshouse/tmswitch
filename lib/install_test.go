@@ -26,7 +26,7 @@ func TestGoarchToTerramate(t *testing.T) {
 }
 
 func TestBuildDownloadURL(t *testing.T) {
-	url := buildDownloadURL("0.16.0")
+	url := buildDownloadURL("0.16.0", "", "")
 	if url == "" {
 		t.Fatal("expected non-empty URL")
 	}
@@ -35,6 +35,13 @@ func TestBuildDownloadURL(t *testing.T) {
 	// URL should contain the version and the OS.
 	if !containsAll(url, []string{"0.16.0", goos}) {
 		t.Errorf("unexpected URL: %s", url)
+	}
+}
+
+func TestBuildDownloadURL_CustomBaseAndArch(t *testing.T) {
+	url := buildDownloadURL("0.16.0", "https://example.com/releases/download/", "amd64")
+	if !containsAll(url, []string{"https://example.com/releases/download/", "0.16.0", "x86_64"}) {
+		t.Fatalf("unexpected URL: %s", url)
 	}
 }
 
@@ -71,10 +78,10 @@ func TestAddRecentAndGetRecentVersions(t *testing.T) {
 	os.Setenv("HOME", tmpDir)
 	defer os.Setenv("HOME", origHome)
 
-	AddRecent("0.16.0")
-	AddRecent("0.15.5")
-	AddRecent("0.15.4")
-	AddRecent("0.15.3") // Should push 0.15.4 out (cap = 3).
+	AddRecent("0.16.0", "")
+	AddRecent("0.15.5", "")
+	AddRecent("0.15.4", "")
+	AddRecent("0.15.3", "") // Should push 0.15.4 out (cap = 3).
 
 	recent, err := GetRecentVersions()
 	if err != nil {
@@ -95,9 +102,9 @@ func TestRecentDeduplicate(t *testing.T) {
 	os.Setenv("HOME", tmpDir)
 	defer os.Setenv("HOME", origHome)
 
-	AddRecent("0.16.0")
-	AddRecent("0.15.5")
-	AddRecent("0.16.0") // duplicate – should move to top without increasing count.
+	AddRecent("0.16.0", "")
+	AddRecent("0.15.5", "")
+	AddRecent("0.16.0", "") // duplicate – should move to top without increasing count.
 
 	recent, err := GetRecentVersions()
 	if err != nil {
@@ -175,5 +182,14 @@ func TestPrepareBinPath_RefusesToOverwriteRegularFile(t *testing.T) {
 	err := prepareBinPath(regularFile)
 	if err == nil {
 		t.Fatal("expected error for existing regular file")
+	}
+}
+
+func TestGetInstallLocationWithBase(t *testing.T) {
+	tmpDir := t.TempDir()
+	got := GetInstallLocationWithBase(tmpDir)
+	expected := filepath.Join(tmpDir, ".terramate.versions")
+	if got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
 	}
 }

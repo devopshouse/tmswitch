@@ -22,11 +22,29 @@ const (
 	maxRecentVersions  = 3
 )
 
+// InstallOptions customizes version download and activation.
+type InstallOptions struct {
+	Arch            string
+	BinPath         string
+	DownloadBaseURL string
+	DryRun          bool
+	InstallPath     string
+}
+
 // GetInstallLocation returns (and creates if necessary) the directory where
 // versioned terramate binaries are stored (~/.terramate.versions/).
 func GetInstallLocation() string {
-	home := GetHomeDirectory()
-	location := home + installPathSuffix
+	return GetInstallLocationWithBase("")
+}
+
+// GetInstallLocationWithBase returns the directory where versioned terramate
+// binaries are stored, rooted at installPath or the user's home when empty.
+func GetInstallLocationWithBase(installPath string) string {
+	base := installPath
+	if base == "" {
+		base = GetHomeDirectory()
+	}
+	location := filepath.Join(base, ".terramate.versions")
 	CreateDirIfNotExist(location)
 	return location
 }
@@ -34,19 +52,30 @@ func GetInstallLocation() string {
 // Install downloads (if necessary) and activates the requested version.
 // It returns the path to the active symlink.
 func Install(version, binPath string) string {
-	binPath = InstallableBinLocation(binPath)
+	return InstallWithOptions(version, InstallOptions{BinPath: binPath})
+}
 
-	installLocation := GetInstallLocation()
+// InstallWithOptions downloads (if necessary) and activates the requested version.
+func InstallWithOptions(version string, options InstallOptions) string {
+	binPath := InstallableBinLocation(options.BinPath)
+	installLocation := GetInstallLocationWithBase(options.InstallPath)
 	versionedBin := ConvertExecutableExt(filepath.Join(installLocation, installBinaryName+"_"+version))
 
-	// If the versioned binary already exists locally, just re-link it.
 	if FileExists(versionedBin) {
-		activateVersion(versionedBin, binPath, version)
+		if options.DryRun {
+			fmt.Printf("[DRY-RUN] Would switch terramate to version %q using %s\n", version, binPath)
+			return binPath
+		}
+		activateVersion(versionedBin, binPath, version, options.InstallPath)
 		return binPath
 	}
 
-	// Download the archive for this OS/arch.
-	url := buildDownloadURL(version)
+	url := buildDownloadURL(version, options.DownloadBaseURL, options.Arch)
+	if options.DryRun {
+		fmt.Printf("[DRY-RUN] Would download terramate v%s from %s and activate %s\n", version, url, binPath)
+		return binPath
+	}
+
 	archivePath, err := downloadFile(installLocation, url)
 	if err != nil {
 		fmt.Printf("Error downloading terramate v%s: %v\n", version, err)
@@ -54,7 +83,6 @@ func Install(version, binPath string) string {
 	}
 	defer os.Remove(archivePath)
 
-	// Extract the binary from the archive.
 	if err := extractBinary(archivePath, installBinaryName, versionedBin); err != nil {
 		fmt.Printf("Error extracting terramate binary: %v\n", err)
 		os.Exit(1)
@@ -64,19 +92,19 @@ func Install(version, binPath string) string {
 		log.Printf("Warning: could not set executable bit on %s: %v", versionedBin, err)
 	}
 
-	activateVersion(versionedBin, binPath, version)
+	activateVersion(versionedBin, binPath, version, options.InstallPath)
 	return binPath
 }
 
 // activateVersion removes the existing symlink/binary at binPath and creates a
 // new symlink pointing to versionedBin.
-func activateVersion(versionedBin, binPath, version string) {
+func activateVersion(versionedBin, binPath, version, installPath string) {
 	if err := prepareBinPath(binPath); err != nil {
 		log.Fatalf("Failed to activate terramate version %q: %v", version, err)
 	}
 	CreateSymlink(versionedBin, binPath)
 	fmt.Printf("Switched terramate to version %q\n", version)
-	AddRecent(version)
+	AddRecent(version, installPath)
 }
 
 func prepareBinPath(binPath string) error {
@@ -107,9 +135,16 @@ func prepareBinPath(binPath string) error {
 //	terramate_{version}_{os}_{arch}.zip      (Windows)
 //
 // where {arch} uses "x86_64" for amd64, "arm64" for arm64, "i386" for 386.
-func buildDownloadURL(version string) string {
+func buildDownloadURL(version, downloadBaseURL, archOverride string) string {
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
+	if archOverride != "" {
+		goarch = archOverride
+	}
+	baseURL := terramateGitHubURL
+	if downloadBaseURL != "" {
+		baseURL = downloadBaseURL
+	}
 
 	arch := goarchToTerramate(goarch)
 	ext := "tar.gz"
@@ -118,7 +153,7 @@ func buildDownloadURL(version string) string {
 	}
 
 	filename := fmt.Sprintf("terramate_%s_%s_%s.%s", version, goos, arch, ext)
-	return fmt.Sprintf("%sv%s/%s", terramateGitHubURL, version, filename)
+	return fmt.Sprintf("%sv%s/%s", baseURL, version, filename)
 }
 
 // goarchToTerramate maps a GOARCH value to the arch string used in terramate
@@ -270,8 +305,8 @@ func fallbackBinPath() string {
 }
 
 // AddRecent adds version to the RECENT file (capped at maxRecentVersions).
-func AddRecent(version string) {
-	installLocation := GetInstallLocation()
+func AddRecent(version, installPath string) {
+	installLocation := GetInstallLocationWithBase(installPath)
 	recentPath := filepath.Join(installLocation, recentFile)
 
 	existing, _ := GetRecentVersions()
@@ -297,7 +332,12 @@ func AddRecent(version string) {
 
 // GetRecentVersions returns the recently used versions with a " *recent" suffix.
 func GetRecentVersions() ([]string, error) {
-	installLocation := GetInstallLocation()
+	return GetRecentVersionsFrom("")
+}
+
+// GetRecentVersionsFrom returns recently used versions from a custom install base.
+func GetRecentVersionsFrom(installPath string) ([]string, error) {
+	installLocation := GetInstallLocationWithBase(installPath)
 	recentPath := filepath.Join(installLocation, recentFile)
 
 	if !FileExists(recentPath) {

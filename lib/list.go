@@ -36,6 +36,11 @@ func GetVersionList(includePrerelease bool) ([]string, error) {
 	return getVersionListFromURL(githubReleasesURL, includePrerelease)
 }
 
+// GetVersionListFromURL fetches versions from a custom releases API URL.
+func GetVersionListFromURL(url string, includePrerelease bool) ([]string, error) {
+	return getVersionListFromURL(url, includePrerelease)
+}
+
 // getVersionListFromURL is the testable implementation of GetVersionList.
 func getVersionListFromURL(url string, includePrerelease bool) ([]string, error) {
 	resp, err := http.Get(url) // #nosec G107
@@ -83,4 +88,33 @@ func VersionExist(version string, list []string) bool {
 		}
 	}
 	return false
+}
+
+// LatestVersion returns the newest version from the provided list.
+func LatestVersion(list []string) (string, error) {
+	if len(list) == 0 {
+		return "", fmt.Errorf("no versions available")
+	}
+	return list[0], nil
+}
+
+// LatestMatchingVersion returns the newest version matching a prefix or exact version.
+func LatestMatchingVersion(list []string, requested string) (string, error) {
+	requested = strings.TrimSpace(strings.TrimPrefix(requested, "v"))
+	if requested == "" {
+		return "", fmt.Errorf("empty version constraint")
+	}
+
+	if ValidVersionFormat(requested) {
+		if VersionExist(requested, list) {
+			return requested, nil
+		}
+	}
+
+	for _, v := range list {
+		if v == requested || strings.HasPrefix(v, requested+".") || strings.HasPrefix(v, requested+"-") {
+			return v, nil
+		}
+	}
+	return "", fmt.Errorf("no version found matching %q", requested)
 }

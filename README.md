@@ -1,5 +1,11 @@
 # tmswitch
 
+[![Build Status](https://github.com/devopshouse/tmswitch/actions/workflows/build.yml/badge.svg)](https://github.com/devopshouse/tmswitch/actions/workflows/build.yml)
+[![Super-Linter](https://github.com/devopshouse/tmswitch/actions/workflows/super-linter.yml/badge.svg)](https://github.com/marketplace/actions/super-linter)
+[![GitHub Release](https://img.shields.io/github/v/release/devopshouse/tmswitch)](https://github.com/devopshouse/tmswitch/releases/latest)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/devopshouse/tmswitch/total)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/devopshouse/tmswitch/latest/total)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/devopshouse/tmswitch)
 [![Go Report Card](https://goreportcard.com/badge/github.com/devopshouse/tmswitch)](https://goreportcard.com/report/github.com/devopshouse/tmswitch)
 
 ## Terramate Switcher
@@ -8,6 +14,17 @@
 [Terramate](https://terramate.io/). If the requested version is not already installed,
 `tmswitch` downloads it automatically from the official
 [GitHub Releases](https://github.com/terramate-io/terramate/releases) page.
+
+This project is based on ideas and behavior from:
+
+- [warrensbox/terraform-switcher](https://github.com/warrensbox/terraform-switcher)
+- [warrensbox/tgswitch](https://github.com/warrensbox/tgswitch)
+
+License note:
+
+- both upstream projects use the MIT License
+- `tmswitch` also uses the MIT License
+- see [THIRD_PARTY_NOTICES.md](/Users/xjulio/git/tmswitch/THIRD_PARTY_NOTICES.md) for attribution context
 
 ---
 
@@ -74,6 +91,28 @@ Pass the `--pre` flag to also show release candidates and other pre-release vers
 tmswitch --pre
 ```
 
+### Latest and implicit version helpers
+
+```bash
+tmswitch --latest
+tmswitch --show-latest
+tmswitch --latest-pre 0.17
+tmswitch --show-latest-pre 0.17
+tmswitch --latest-stable 0.16
+tmswitch --show-latest-stable 0.16
+tmswitch --list-all
+```
+
+These flags are modeled after the `tfswitch` UX:
+
+- `--latest` installs the newest stable release
+- `--show-latest` prints the newest stable release
+- `--latest-pre <prefix>` installs the newest matching pre-release
+- `--show-latest-pre <prefix>` prints the newest matching pre-release
+- `--latest-stable <prefix>` installs the newest matching stable release
+- `--show-latest-stable <prefix>` prints the newest matching stable release
+- `--list-all` prints all available releases, including pre-releases
+
 ### Use a version file
 
 Create a `.tmswitchrc` or `.terramate-version` file in your project directory:
@@ -122,6 +161,21 @@ Precedence is:
 tmswitch --bin /home/user/bin/terramate 0.16.0
 ```
 
+### Operational flags
+
+```bash
+tmswitch --dry-run --latest
+tmswitch --install "$HOME/custom-tools" --latest
+tmswitch --arch amd64 --latest
+tmswitch --mirror https://github.com/terramate-io/terramate --latest
+```
+
+- `--dry-run` shows what would happen without downloading or switching
+- `--install <dir>` changes the root used for `.terramate.versions`
+- `--arch <arch>` overrides the CPU architecture used for downloads
+- `--mirror <url>` overrides the GitHub repo/API/download base used for version lookup and downloads
+- `--default <version>` sets the CLI fallback version if no other source resolved one
+
 ---
 
 ## Options
@@ -141,6 +195,27 @@ Environment variables:
 | `TM_VERSION` | Explicit Terramate version override |
 | `TM_DEFAULT_VERSION` | Fallback Terramate version |
 | `TM_BINARY_PATH` | Override binary install path unless `--bin` is provided |
+
+Additional tfswitch-style flags:
+
+| Flag | Description |
+|------|-------------|
+| `--latest` | Install latest stable version |
+| `--show-latest` | Print latest stable version |
+| `--latest-pre <prefix>` | Install latest matching pre-release |
+| `--show-latest-pre <prefix>` | Print latest matching pre-release |
+| `--latest-stable <prefix>` | Install latest matching stable version |
+| `--show-latest-stable <prefix>` | Print latest matching stable version |
+| `--list-all` | Print all versions, including pre-releases |
+| `--default <version>` | Fallback version when no other source exists |
+| `--dry-run` | Show actions without downloading or switching |
+| `--install <dir>` | Root path used for `.terramate.versions` |
+| `--arch <arch>` | Override download architecture |
+| `--mirror <url>` | Override GitHub repo/API/download base |
+| `--product terramate` | Product selector placeholder for tfswitch parity |
+| `--force-color` | Force color output if terminal supports it |
+| `--no-color` | Disable color output |
+| `--log-level <level>` | Set log level (`OFF` suppresses stdlib logs) |
 
 ---
 

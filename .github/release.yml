@@ -1,0 +1,31 @@
+changelog:
+  categories:
+    - title: Added
+      labels:
+        - experimental
+        - feature
+        - new feature
+    - title: Changed
+      labels:
+        - backwards-incompatible
+        - deprecated
+        - enhancement
+    - title: Fixed
+      labels:
+        - bug
+        - bugfix
+        - fix
+        - fixed
+    - title: Documentation
+      labels:
+        - docs
+        - documentation
+    - title: Security
+      labels:
+        - security
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other
+      labels:
+        - "*"
