@@ -78,10 +78,15 @@ func TestCheckSymlinkCreateRemove(t *testing.T) {
 	target := filepath.Join(tmpDir, "target")
 	link := filepath.Join(tmpDir, "link")
 
-	os.WriteFile(target, []byte("hi"), 0644)
+	if err := os.WriteFile(target, []byte("hi"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 
 	if CheckSymlink(link) {
 		t.Error("link should not exist yet")
+	}
+	if CheckSymlink(target) {
+		t.Error("regular file should not be treated as symlink")
 	}
 
 	CreateSymlink(target, link)

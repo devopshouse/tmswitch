@@ -143,3 +143,37 @@ func TestInstallableBinLocation_FallbackToHomeBin(t *testing.T) {
 		t.Errorf("expected fallback path %q, got %q", expectedBin, got)
 	}
 }
+
+func TestPrepareBinPath_RemovesExistingSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "versioned")
+	link := filepath.Join(tmpDir, "terramate")
+
+	if err := os.WriteFile(target, []byte("bin"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	if err := prepareBinPath(link); err != nil {
+		t.Fatalf("prepareBinPath: %v", err)
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatalf("expected symlink to be removed, got err=%v", err)
+	}
+}
+
+func TestPrepareBinPath_RefusesToOverwriteRegularFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	regularFile := filepath.Join(tmpDir, "terramate")
+
+	if err := os.WriteFile(regularFile, []byte("real binary"), 0755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	err := prepareBinPath(regularFile)
+	if err == nil {
+		t.Fatal("expected error for existing regular file")
+	}
+}

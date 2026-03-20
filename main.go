@@ -33,12 +33,16 @@ import (
 )
 
 const (
-	defaultBin    = "/usr/local/bin/terramate"
-	rcFilename    = ".tmswitchrc"
-	tmvFilename   = ".terramate-version"
-	tomlFilename  = ".tmswitch.toml"
-	appVersion    = "0.1.0"
+	defaultBin   = "/usr/local/bin/terramate"
+	rcFilename   = ".tmswitchrc"
+	tmvFilename  = ".terramate-version"
+	tomlFilename = ".tmswitch.toml"
+	envVersion   = "TM_VERSION"
+	envDefault   = "TM_DEFAULT_VERSION"
+	envBinPath   = "TM_BINARY_PATH"
 )
+
+var appVersion = "dev"
 
 func main() {
 	dir := lib.GetCurrentDirectory()
@@ -66,86 +70,95 @@ func main() {
 	}
 
 	homedir := lib.GetHomeDirectory()
-
-	TOMLConfigFile := filepath.Join(*chDirPath, tomlFilename)
-	HomeTOMLConfigFile := filepath.Join(homedir, tomlFilename)
-	RCFile := filepath.Join(*chDirPath, rcFilename)
-	TMVersionFile := filepath.Join(*chDirPath, tmvFilename)
-
-	// TOML config takes highest precedence (after CLI flags).
-	switch {
-	case lib.FileExists(TOMLConfigFile) || lib.FileExists(HomeTOMLConfigFile):
-		binPath := *custBinPath
-		cfgVersion := ""
-		if lib.FileExists(TOMLConfigFile) {
-			cfgVersion, binPath = readTOMLConfig(binPath, *chDirPath)
-		} else {
-			cfgVersion, binPath = readTOMLConfig(binPath, homedir)
-		}
-
-		switch {
-		case len(args) == 1:
-			installVersionArg(args[0], &binPath)
-		case lib.FileExists(RCFile) && len(args) == 0:
-			v := lib.RetrieveFileContents(RCFile)
-			installVersion(v, &binPath)
-		case lib.FileExists(TMVersionFile) && len(args) == 0:
-			v := lib.RetrieveFileContents(TMVersionFile)
-			installVersion(v, &binPath)
-		case cfgVersion != "" && len(args) == 0:
-			installVersion(cfgVersion, &binPath)
-		default:
-			selectVersionInteractive(&binPath, *preFlag)
-		}
-
-	case len(args) == 1:
-		binPath := *custBinPath
-		installVersionArg(args[0], &binPath)
-
-	case lib.FileExists(RCFile) && len(args) == 0:
-		binPath := *custBinPath
-		v := lib.RetrieveFileContents(RCFile)
-		installVersion(v, &binPath)
-
-	case lib.FileExists(TMVersionFile) && len(args) == 0:
-		binPath := *custBinPath
-		v := lib.RetrieveFileContents(TMVersionFile)
-		installVersion(v, &binPath)
-
-	default:
-		binPath := *custBinPath
+	version, binPath, interactive := resolveInstallRequest(args, *chDirPath, homedir, *custBinPath)
+	if interactive {
 		selectVersionInteractive(&binPath, *preFlag)
+		return
+	}
+	installVersion(version, &binPath)
+}
+
+type tomlConfig struct {
+	Version        string
+	DefaultVersion string
+	BinPath        string
+}
+
+// resolveInstallRequest resolves the effective version/bin request, following
+// CLI args first, then plain-text version files, then TOML explicit/default
+// versions. If no version is resolved, interactive indicates that the selector
+// should be shown.
+func resolveInstallRequest(args []string, chDirPath, homedir, cliBinPath string) (string, string, bool) {
+	tomlConfigFile := filepath.Join(chDirPath, tomlFilename)
+	homeTOMLConfigFile := filepath.Join(homedir, tomlFilename)
+	rcFile := filepath.Join(chDirPath, rcFilename)
+	tmVersionFile := filepath.Join(chDirPath, tmvFilename)
+
+	binPath := cliBinPath
+	cfg := tomlConfig{}
+
+	switch {
+	case lib.FileExists(tomlConfigFile):
+		cfg = readTOMLConfig(binPath, chDirPath)
+	case lib.FileExists(homeTOMLConfigFile):
+		cfg = readTOMLConfig(binPath, homedir)
+	}
+	binPath = cfg.BinPath
+
+	if envBin := strings.TrimSpace(os.Getenv(envBinPath)); envBin != "" && cliBinPath == lib.ConvertExecutableExt(defaultBin) {
+		binPath = envBin
+	}
+
+	envRequestedVersion := strings.TrimSpace(os.Getenv(envVersion))
+	envDefaultVersion := strings.TrimSpace(os.Getenv(envDefault))
+
+	switch {
+	case len(args) == 1:
+		return args[0], binPath, false
+	case envRequestedVersion != "":
+		return envRequestedVersion, binPath, false
+	case lib.FileExists(rcFile):
+		return lib.RetrieveFileContents(rcFile), binPath, false
+	case lib.FileExists(tmVersionFile):
+		return lib.RetrieveFileContents(tmVersionFile), binPath, false
+	case cfg.Version != "":
+		return cfg.Version, binPath, false
+	case envDefaultVersion != "":
+		return envDefaultVersion, binPath, false
+	case cfg.DefaultVersion != "":
+		return cfg.DefaultVersion, binPath, false
+	default:
+		return "", binPath, true
 	}
 }
 
-// installVersionArg validates and installs the version supplied as a CLI arg.
-func installVersionArg(requested string, binPath *string) {
-	if !lib.ValidVersionFormat(requested) {
-		fmt.Println("Invalid terramate version format. Expected format: #.#.# or #.#.#-@")
+func installVersion(version string, binPath *string) {
+	version, warnErr, fatalErr := validateRequestedVersion(version, lib.GetVersionList)
+	if fatalErr != nil {
+		fmt.Println(fatalErr.Error())
 		usageMessage()
 		os.Exit(1)
 	}
-
-	// Attempt to validate against the releases list; skip validation on API errors.
-	versions, err := lib.GetVersionList(true)
-	if err != nil {
-		fmt.Printf("Warning: could not fetch releases list (%v). Attempting install anyway.\n", err)
-	} else if !lib.VersionExist(requested, versions) {
-		fmt.Printf("Version %q not found in the available releases.\n", requested)
-		os.Exit(1)
-	}
-
-	lib.Install(requested, *binPath)
-}
-
-// installVersion installs the given version (read from a config/version file).
-func installVersion(version string, binPath *string) {
-	version = strings.TrimSpace(version)
-	if !lib.ValidVersionFormat(version) {
-		fmt.Printf("Invalid version %q in version file.\n", version)
-		os.Exit(1)
+	if warnErr != nil {
+		fmt.Printf("Warning: could not fetch releases list (%v). Attempting install anyway.\n", warnErr)
 	}
 	lib.Install(version, *binPath)
+}
+
+func validateRequestedVersion(requested string, fetchVersions func(bool) ([]string, error)) (string, error, error) {
+	version := strings.TrimSpace(requested)
+	if !lib.ValidVersionFormat(version) {
+		return "", nil, fmt.Errorf("invalid terramate version format %q. Expected format: #.#.# or #.#.#-@", version)
+	}
+
+	versions, err := fetchVersions(true)
+	if err != nil {
+		return version, err, nil
+	}
+	if !lib.VersionExist(version, versions) {
+		return "", nil, fmt.Errorf("version %q not found in the available releases", version)
+	}
+	return version, nil, nil
 }
 
 // selectVersionInteractive shows an interactive prompt to pick a version.
@@ -188,8 +201,7 @@ func selectVersionInteractive(binPath *string, includePrerelease bool) {
 
 // readTOMLConfig reads the .tmswitch.toml configuration file from the given
 // directory, overriding binPath only if a custom bin is not already set.
-// Returns the version and effective bin path.
-func readTOMLConfig(binPath, dir string) (string, string) {
+func readTOMLConfig(binPath, dir string) tomlConfig {
 	v := viper.New()
 	v.SetConfigName(".tmswitch")
 	v.SetConfigType("toml")
@@ -206,8 +218,11 @@ func readTOMLConfig(binPath, dir string) (string, string) {
 		}
 	}
 
-	version := v.GetString("version")
-	return version, binPath
+	return tomlConfig{
+		Version:        v.GetString("version"),
+		DefaultVersion: v.GetString("default-version"),
+		BinPath:        binPath,
+	}
 }
 
 func usageMessage() {
@@ -224,9 +239,12 @@ Usage:
   tmswitch --help                 Display this help message
 
 Version files (in order of precedence):
-  .tmswitch.toml                  TOML file with optional 'version' and 'bin' keys
+  TM_VERSION                      Environment override for the Terramate version
   .tmswitchrc                     Plain text file with a version string
   .terramate-version              Plain text file with a version string (tfenv-style)
+  TM_DEFAULT_VERSION              Environment fallback version
+  .tmswitch.toml                  TOML file with optional 'version', 'default-version', and 'bin' keys
+  TM_BINARY_PATH                  Environment override for the Terramate binary path
 
 `)
 }

@@ -1,0 +1,65 @@
+version: 2
+
+project_name: tmswitch
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: tmswitch
+    main: .
+    binary: tmswitch
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.appVersion={{ .Version }}
+
+archives:
+  - id: default
+    ids:
+      - tmswitch
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: git
+
+release:
+  github:
+    owner: devopshouse
+    name: tmswitch
+
+brews:
+  - name: tmswitch
+    ids:
+      - default
+    repository:
+      owner: devopshouse
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/devopshouse/tmswitch
+    description: Switch between different versions of Terramate
+    license: MIT
+    directory: Formula
+    install: |
+      bin.install "tmswitch"
+    test: |
+      assert_match "tmswitch version:", shell_output("#{bin}/tmswitch --version")

@@ -71,12 +71,31 @@ func Install(version, binPath string) string {
 // activateVersion removes the existing symlink/binary at binPath and creates a
 // new symlink pointing to versionedBin.
 func activateVersion(versionedBin, binPath, version string) {
-	if CheckSymlink(binPath) {
-		RemoveSymlink(binPath)
+	if err := prepareBinPath(binPath); err != nil {
+		log.Fatalf("Failed to activate terramate version %q: %v", version, err)
 	}
 	CreateSymlink(versionedBin, binPath)
 	fmt.Printf("Switched terramate to version %q\n", version)
 	AddRecent(version)
+}
+
+func prepareBinPath(binPath string) error {
+	info, err := os.Lstat(binPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("inspect existing binary path %s: %w", binPath, err)
+	}
+
+	if info.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("refusing to overwrite existing non-symlink at %s", binPath)
+	}
+
+	if err := os.Remove(binPath); err != nil {
+		return fmt.Errorf("remove existing symlink %s: %w", binPath, err)
+	}
+	return nil
 }
 
 // buildDownloadURL constructs the GitHub release download URL for the current
