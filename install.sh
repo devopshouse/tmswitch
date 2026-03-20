@@ -15,6 +15,7 @@ need_cmd() {
 }
 
 need_cmd curl
+need_cmd install
 need_cmd tar
 need_cmd uname
 
@@ -42,11 +43,8 @@ esac
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
-latest_tag="$(
-  curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-  | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' \
-  | head -n 1
-)"
+latest_release_json="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest")"
+latest_tag="$(printf '%s' "$latest_release_json" | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -n 1)"
 
 if [[ -z "$latest_tag" ]]; then
   echo "error: could not determine latest release tag" >&2
@@ -71,13 +69,14 @@ chmod +x "$tmpdir/tmswitch"
 mkdir -p "$INSTALL_DIR"
 
 if [[ -w "$INSTALL_DIR" ]]; then
-  mv "$tmpdir/tmswitch" "$INSTALL_DIR/tmswitch"
+  install -m 0755 "$tmpdir/tmswitch" "$INSTALL_DIR/tmswitch"
 elif [[ "${INSTALL_DIR}" == "${DEFAULT_INSTALL_DIR}" ]]; then
-  mkdir -p "$FALLBACK_INSTALL_DIR"
-  sudo mv "$tmpdir/tmswitch" "$FALLBACK_INSTALL_DIR/tmswitch"
+  sudo mkdir -p "$FALLBACK_INSTALL_DIR"
+  sudo install -m 0755 "$tmpdir/tmswitch" "$FALLBACK_INSTALL_DIR/tmswitch"
   INSTALL_DIR="$FALLBACK_INSTALL_DIR"
 else
-  sudo mv "$tmpdir/tmswitch" "$INSTALL_DIR/tmswitch"
+  sudo mkdir -p "$INSTALL_DIR"
+  sudo install -m 0755 "$tmpdir/tmswitch" "$INSTALL_DIR/tmswitch"
 fi
 
 echo "Installed tmswitch ${latest_tag} to $INSTALL_DIR/tmswitch"
