@@ -40,3 +40,4 @@ jobs:
           VALIDATE_JSON_PRETTIER: false
           VALIDATE_JSCPD: false
           BASH_EXEC_IGNORE_LIBRARIES: true
+          FILTER_REGEX_EXCLUDE: (^|/)README\.md$
