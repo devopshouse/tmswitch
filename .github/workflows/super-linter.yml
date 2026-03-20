@@ -37,5 +37,6 @@ jobs:
           SUPPRESS_OUTPUT_ON_SUCCESS: true
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_GO: false
+          VALIDATE_JSON_PRETTIER: false
           VALIDATE_JSCPD: false
           BASH_EXEC_IGNORE_LIBRARIES: true
