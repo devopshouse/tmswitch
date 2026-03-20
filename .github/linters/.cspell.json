@@ -1,9 +1,6 @@
 {
-  "version": "0.2",
-  "language": "en",
-  "ignorePaths": [],
-  "words": [
-    "tmswitch",
-    "Terramate"
-  ]
+	"version": "0.2",
+	"language": "en",
+	"ignorePaths": [],
+	"words": ["tmswitch", "Terramate"]
 }
