@@ -3,6 +3,7 @@
 [![Build Status](https://github.com/devopshouse/tmswitch/actions/workflows/build.yml/badge.svg)](https://github.com/devopshouse/tmswitch/actions/workflows/build.yml)
 [![Super-Linter](https://github.com/devopshouse/tmswitch/actions/workflows/super-linter.yml/badge.svg)](https://github.com/marketplace/actions/super-linter)
 [![GitHub Release](https://img.shields.io/github/v/release/devopshouse/tmswitch)](https://github.com/devopshouse/tmswitch/releases/latest)
+[![GitHub Downloads](https://img.shields.io/github/downloads/devopshouse/tmswitch/total)](https://github.com/devopshouse/tmswitch/releases)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/devopshouse/tmswitch)
 [![Go Report Card](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fgoreportcard.com%2Freport%2Fgithub.com%2Fdevopshouse%2Ftmswitch&search=%22grade%22%3A%22(%5B%5E%22%5D%2B)%22&replace=%241&label=go%20report&color=brightgreen&cacheSeconds=3600)](https://goreportcard.com/report/github.com/devopshouse/tmswitch)
 
@@ -28,11 +29,28 @@ License note:
 
 ## Installation
 
+Prebuilt release archives are published for:
+
+- macOS `amd64`
+- macOS `arm64`
+- Linux `amd64`
+- Linux `arm64`
+
+### Linux / macOS (via curl installer)
+
+```bash
+curl -L https://raw.githubusercontent.com/devopshouse/tmswitch/main/install.sh | bash
+```
+
 ### Linux / macOS (from source)
 
 ```bash
 go install github.com/devopshouse/tmswitch@latest
 ```
+
+### Manual download
+
+Download the appropriate archive from [GitHub Releases](https://github.com/devopshouse/tmswitch/releases/latest), extract it, and move `tmswitch` into your `PATH`.
 
 ### Homebrew
 
