@@ -23,21 +23,21 @@ os="$(uname -s)"
 arch="$(uname -m)"
 
 case "$os" in
-	Darwin) os="darwin" ;;
-	Linux) os="linux" ;;
-	*)
-		echo "error: unsupported operating system: $os" >&2
-		exit 1
-		;;
+Darwin) os="darwin" ;;
+Linux) os="linux" ;;
+*)
+	echo "error: unsupported operating system: $os" >&2
+	exit 1
+	;;
 esac
 
 case "$arch" in
-	x86_64|amd64) arch="x86_64" ;;
-	arm64|aarch64) arch="arm64" ;;
-	*)
-		echo "error: unsupported architecture: $arch" >&2
-		exit 1
-		;;
+x86_64 | amd64) arch="x86_64" ;;
+arm64 | aarch64) arch="arm64" ;;
+*)
+	echo "error: unsupported architecture: $arch" >&2
+	exit 1
+	;;
 esac
 
 tmpdir="$(mktemp -d)"
