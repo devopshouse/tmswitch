@@ -236,23 +236,27 @@ MIT
 
 ## Release automation
 
-This repository is wired for GitHub Releases plus a Homebrew tap through GoReleaser.
+This repository is wired for automated release PRs, GitHub Releases, and a Homebrew tap.
 
 Required setup:
 
 1. Create the tap repository `devopshouse/homebrew-tap`.
 2. Create a GitHub token with write access to that repository.
 3. Save it in this repository as the `TAP_GITHUB_TOKEN` Actions secret.
-4. Push a tag such as `v0.1.0`.
+4. Create a GitHub token with write access to `devopshouse/tmswitch`.
+5. Save it in this repository as the `RELEASE_PLEASE_TOKEN` Actions secret.
 
-The release workflow in [.github/workflows/release.yml](/Users/xjulio/git/tmswitch/.github/workflows/release.yml) will:
+The automation now works like this:
 
-1. Run the test suite.
-2. Build release archives for macOS and Linux.
-3. Publish a GitHub Release.
-4. Update the Homebrew cask in `devopshouse/homebrew-tap`.
+1. [.github/workflows/release-please.yml](/Users/xjulio/git/tmswitch/.github/workflows/release-please.yml) runs on every push to `main`.
+2. It opens or updates a release PR with the next version and changelog.
+3. When that release PR is merged, `release-please` creates the next `v*` tag automatically.
+4. That tag triggers [.github/workflows/release.yml](/Users/xjulio/git/tmswitch/.github/workflows/release.yml).
+5. The release workflow runs the test suite, builds release archives, publishes binaries, and updates the Homebrew cask in `devopshouse/homebrew-tap`.
 
 Notes:
 
+- `release-please` works best with Conventional Commits in merged commits or squash-merge PR titles, such as `fix: handle brew cask resolution` or `feat: add latest-stable selector`.
+- If `RELEASE_PLEASE_TOKEN` is not set, the workflow falls back to `GITHUB_TOKEN`. That is enough to manage the release PR, but it may not trigger downstream workflows from the created tag.
 - The Homebrew publishing uses `homebrew_casks` in [.goreleaser.yaml](/Users/xjulio/git/tmswitch/.goreleaser.yaml), which is the current GoReleaser-supported replacement for deprecated `brews`.
 - The Homebrew install command is `brew install --cask devopshouse/tap/tmswitch`.
