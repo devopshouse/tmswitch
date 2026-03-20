@@ -4,7 +4,6 @@
 [![Super-Linter](https://github.com/devopshouse/tmswitch/actions/workflows/super-linter.yml/badge.svg)](https://github.com/marketplace/actions/super-linter)
 [![GitHub Release](https://img.shields.io/github/v/release/devopshouse/tmswitch)](https://github.com/devopshouse/tmswitch/releases/latest)
 [![Release Asset Downloads](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/devopshouse/tmswitch/main/.github/badges/release-asset-downloads.json)](https://github.com/devopshouse/tmswitch/releases)
-![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/devopshouse/tmswitch/latest/total)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/devopshouse/tmswitch)
 [![Go Report Card](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fgoreportcard.com%2Freport%2Fgithub.com%2Fdevopshouse%2Ftmswitch&search=%22grade%22%3A%22(%5B%5E%22%5D%2B)%22&replace=%241&label=go%20report&color=brightgreen&cacheSeconds=3600)](https://goreportcard.com/report/github.com/devopshouse/tmswitch)
 
