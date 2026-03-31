@@ -49,11 +49,16 @@ func TestGetVersionListFromURL(t *testing.T) {
 		{TagName: "v0.15.5", Prerelease: false, Draft: false},
 		{TagName: "v0.15.4", Prerelease: false, Draft: true}, // should be excluded
 	}
-	body, _ := json.Marshal(releases)
+	body, err := json.Marshal(releases)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(body)
+		if _, err := w.Write(body); err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 
@@ -80,7 +85,7 @@ func TestGetVersionListFromURL(t *testing.T) {
 }
 
 func TestGetVersionListFromURL_HTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()

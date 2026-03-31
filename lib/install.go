@@ -58,7 +58,6 @@ func Install(version, binPath string) string {
 // InstallWithOptions downloads (if necessary) and activates the requested version.
 func InstallWithOptions(version string, options InstallOptions) string {
 	release := AcquireInstallLock()
-	defer release()
 	binPath := InstallableBinLocation(options.BinPath)
 	installLocation := GetInstallLocationWithBase(options.InstallPath)
 	versionedBin := ConvertExecutableExt(filepath.Join(installLocation, installBinaryName+"_"+version))
@@ -66,26 +65,31 @@ func InstallWithOptions(version string, options InstallOptions) string {
 	if FileExists(versionedBin) {
 		if options.DryRun {
 			fmt.Printf("[DRY-RUN] Would switch terramate to version %q using %s\n", version, binPath)
+			release()
 			return binPath
 		}
 		activateVersion(versionedBin, binPath, version, options.InstallPath)
+		release()
 		return binPath
 	}
 
 	url := buildDownloadURL(version, options.DownloadBaseURL, options.Arch)
 	if options.DryRun {
 		fmt.Printf("[DRY-RUN] Would download terramate v%s from %s and activate %s\n", version, url, binPath)
+		release()
 		return binPath
 	}
 
 	archivePath, err := downloadFile(installLocation, url)
 	if err != nil {
+		release()
 		fmt.Printf("Error downloading terramate v%s: %v\n", version, err)
 		os.Exit(1)
 	}
 	defer os.Remove(archivePath)
 
 	if err := extractBinary(archivePath, installBinaryName, versionedBin); err != nil {
+		release()
 		fmt.Printf("Error extracting terramate binary: %v\n", err)
 		os.Exit(1)
 	}
@@ -95,6 +99,7 @@ func InstallWithOptions(version string, options InstallOptions) string {
 	}
 
 	activateVersion(versionedBin, binPath, version, options.InstallPath)
+	release()
 	return binPath
 }
 
@@ -239,7 +244,7 @@ func extractFromTarGz(archivePath, binaryName, destPath string) error {
 				return err
 			}
 			defer out.Close()
-			if _, err := io.Copy(out, tr); err != nil { // #nosec G110
+			if _, err := io.Copy(out, tr); err != nil { //nolint:gosec // G110: archive is a known trusted terramate release
 				return err
 			}
 			return nil
@@ -269,7 +274,7 @@ func extractFromZip(archivePath, binaryName, destPath string) error {
 			}
 			defer out.Close()
 
-			if _, err := io.Copy(out, rc); err != nil { // #nosec G110
+			if _, err := io.Copy(out, rc); err != nil { //nolint:gosec // G110: archive is a known trusted terramate release
 				return err
 			}
 			return nil
@@ -327,7 +332,10 @@ func AddRecent(version, installPath string) {
 	installLocation := GetInstallLocationWithBase(installPath)
 	recentPath := filepath.Join(installLocation, recentFile)
 
-	existing, _ := GetRecentVersions()
+	existing, err := GetRecentVersions()
+	if err != nil {
+		log.Printf("Warning: failed to load recent versions: %v", err)
+	}
 	// Strip the " *recent" suffix that GetRecentVersions appends.
 	var clean []string
 	for _, v := range existing {
