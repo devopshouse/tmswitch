@@ -57,6 +57,7 @@ func Install(version, binPath string) string {
 
 // InstallWithOptions downloads (if necessary) and activates the requested version.
 func InstallWithOptions(version string, options InstallOptions) string {
+	release := AcquireInstallLock()
 	binPath := InstallableBinLocation(options.BinPath)
 	installLocation := GetInstallLocationWithBase(options.InstallPath)
 	versionedBin := ConvertExecutableExt(filepath.Join(installLocation, installBinaryName+"_"+version))
@@ -64,35 +65,42 @@ func InstallWithOptions(version string, options InstallOptions) string {
 	if FileExists(versionedBin) {
 		if options.DryRun {
 			fmt.Printf("[DRY-RUN] Would switch terramate to version %q using %s\n", version, binPath)
+			release()
 			return binPath
 		}
 		activateVersion(versionedBin, binPath, version, options.InstallPath)
+		release()
 		return binPath
 	}
 
 	url := buildDownloadURL(version, options.DownloadBaseURL, options.Arch)
 	if options.DryRun {
 		fmt.Printf("[DRY-RUN] Would download terramate v%s from %s and activate %s\n", version, url, binPath)
+		release()
 		return binPath
 	}
 
 	archivePath, err := downloadFile(installLocation, url)
 	if err != nil {
+		release()
 		fmt.Printf("Error downloading terramate v%s: %v\n", version, err)
 		os.Exit(1)
 	}
-	defer os.Remove(archivePath)
 
 	if err := extractBinary(archivePath, installBinaryName, versionedBin); err != nil {
+		os.Remove(archivePath)
+		release()
 		fmt.Printf("Error extracting terramate binary: %v\n", err)
 		os.Exit(1)
 	}
+	os.Remove(archivePath)
 
 	if err := os.Chmod(versionedBin, 0755); err != nil {
 		log.Printf("Warning: could not set executable bit on %s: %v", versionedBin, err)
 	}
 
 	activateVersion(versionedBin, binPath, version, options.InstallPath)
+	release()
 	return binPath
 }
 
@@ -148,7 +156,7 @@ func buildDownloadURL(version, downloadBaseURL, archOverride string) string {
 
 	arch := goarchToTerramate(goarch)
 	ext := "tar.gz"
-	if goos == "windows" {
+	if goos == osWindows {
 		ext = "zip"
 	}
 
@@ -237,7 +245,7 @@ func extractFromTarGz(archivePath, binaryName, destPath string) error {
 				return err
 			}
 			defer out.Close()
-			if _, err := io.Copy(out, tr); err != nil { // #nosec G110
+			if _, err := io.Copy(out, tr); err != nil { //nolint:gosec // G110: archive is a known trusted terramate release
 				return err
 			}
 			return nil
@@ -267,7 +275,7 @@ func extractFromZip(archivePath, binaryName, destPath string) error {
 			}
 			defer out.Close()
 
-			if _, err := io.Copy(out, rc); err != nil { // #nosec G110
+			if _, err := io.Copy(out, rc); err != nil { //nolint:gosec // G110: archive is a known trusted terramate release
 				return err
 			}
 			return nil
@@ -276,32 +284,48 @@ func extractFromZip(archivePath, binaryName, destPath string) error {
 	return fmt.Errorf("binary %q not found in zip %s", binaryName, archivePath)
 }
 
-// InstallableBinLocation determines the effective install location for the
-// terramate binary symlink.  If the requested location is not writable, it
-// falls back to ~/bin (creating it if needed).
-func InstallableBinLocation(userBinPath string) string {
-	binDir := Path(userBinPath)
-
-	if !DirExists(binDir) {
-		fmt.Printf("[Error] Binary path directory does not exist: %s\n", binDir)
-		fmt.Printf("[Error] Please create it manually and try again.\n")
-		os.Exit(1)
-	}
-
-	if IsDirWritable(binDir) {
-		return userBinPath
-	}
-	return fallbackBinPath()
+// installLocation is a candidate path for placing the terramate binary symlink.
+type installLocation struct {
+	path   string
+	create bool // whether to create the directory if it doesn't exist
 }
 
-func fallbackBinPath() string {
+// InstallableBinLocation returns the effective install path for the terramate
+// binary symlink. It tries each candidate in order, falling back to ~/bin
+// (creating it if necessary) when the primary location is not writable.
+func InstallableBinLocation(userBinPath string) string {
 	home := GetHomeDirectory()
-	homeBin := filepath.Join(home, "bin")
-	CreateDirIfNotExist(homeBin)
-	fmt.Printf("No write permission to default bin location.\n")
-	fmt.Printf("Installing terramate at %s\n", homeBin)
-	fmt.Printf("RUN `export PATH=$PATH:%s` to add it to your PATH.\n", homeBin)
-	return ConvertExecutableExt(filepath.Join(homeBin, installBinaryName))
+	homeBin := ConvertExecutableExt(filepath.Join(home, "bin", installBinaryName))
+
+	candidates := []installLocation{
+		{path: userBinPath, create: false},
+		{path: homeBin, create: true},
+	}
+
+	for _, loc := range candidates {
+		binDir := Path(loc.path)
+		if !DirExists(binDir) {
+			if !loc.create {
+				continue
+			}
+			CreateDirIfNotExist(binDir)
+		}
+		if !IsDirWritable(binDir) {
+			continue
+		}
+		if loc.path != userBinPath {
+			fmt.Printf("No write permission to default bin location.\n")
+			fmt.Printf("Installing terramate at %s\n", loc.path)
+			if !IsInPath(binDir) {
+				fmt.Printf("RUN `export PATH=$PATH:%s` to add it to your PATH.\n", binDir)
+			}
+		}
+		return loc.path
+	}
+
+	fmt.Printf("[Error] Could not find a writable location for the terramate binary.\n")
+	os.Exit(1)
+	return ""
 }
 
 // AddRecent adds version to the RECENT file (capped at maxRecentVersions).
@@ -309,7 +333,10 @@ func AddRecent(version, installPath string) {
 	installLocation := GetInstallLocationWithBase(installPath)
 	recentPath := filepath.Join(installLocation, recentFile)
 
-	existing, _ := GetRecentVersions()
+	existing, err := GetRecentVersions()
+	if err != nil {
+		log.Printf("Warning: failed to load recent versions: %v", err)
+	}
 	// Strip the " *recent" suffix that GetRecentVersions appends.
 	var clean []string
 	for _, v := range existing {

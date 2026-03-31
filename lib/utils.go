@@ -9,6 +9,8 @@ import (
 	"runtime"
 )
 
+const osWindows = "windows"
+
 // GetHomeDirectory returns the current user's home directory.
 func GetHomeDirectory() string {
 	home, err := os.UserHomeDir()
@@ -56,7 +58,7 @@ func CreateDirIfNotExist(path string) {
 
 // IsDirWritable returns true if the given directory is writable.
 func IsDirWritable(path string) bool {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		return false
 	}
 	tmpFile := filepath.Join(path, ".tmswitch_write_test")
@@ -85,10 +87,18 @@ func RemoveSymlink(path string) {
 	}
 }
 
-// CreateSymlink creates a symlink from src to dest.
+// CreateSymlink creates a symlink from src to dest using absolute paths.
 func CreateSymlink(src, dest string) {
-	if err := os.Symlink(src, dest); err != nil {
-		log.Fatalf("Failed to create symlink %s -> %s: %v", dest, src, err)
+	absSrc, err := filepath.Abs(src)
+	if err != nil {
+		log.Fatalf("Failed to resolve absolute path for %s: %v", src, err)
+	}
+	absDest, err := filepath.Abs(dest)
+	if err != nil {
+		log.Fatalf("Failed to resolve absolute path for %s: %v", dest, err)
+	}
+	if err := os.Symlink(absSrc, absDest); err != nil {
+		log.Fatalf("Failed to create symlink %s -> %s: %v", absDest, absSrc, err)
 	}
 }
 
@@ -151,7 +161,7 @@ func RetrieveFileContents(path string) string {
 
 // ConvertExecutableExt appends ".exe" on Windows if not already present.
 func ConvertExecutableExt(path string) string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		if filepath.Ext(path) != ".exe" {
 			return path + ".exe"
 		}
@@ -162,4 +172,28 @@ func ConvertExecutableExt(path string) string {
 // Path returns the directory component of the given file path.
 func Path(p string) string {
 	return filepath.Dir(p)
+}
+
+// IsInPath reports whether dir is present in the current PATH environment.
+func IsInPath(dir string) bool {
+	for _, p := range filepath.SplitList(os.Getenv("PATH")) {
+		if p == dir {
+			return true
+		}
+	}
+	return false
+}
+
+const installLockFile = ".tmswitch.lock"
+
+// AcquireInstallLock creates an exclusive lock file to prevent concurrent
+// installations. Returns a release function that removes the lock.
+func AcquireInstallLock() func() {
+	lockPath := filepath.Join(os.TempDir(), installLockFile)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600) // #nosec G304
+	if err != nil {
+		log.Fatalf("Another tmswitch process appears to be running.\nIf this is unexpected, remove %s and try again.", lockPath)
+	}
+	f.Close()
+	return func() { os.Remove(lockPath) }
 }

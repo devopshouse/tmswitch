@@ -217,7 +217,9 @@ func resolveInstallRequestWithDefault(args []string, chDirPath, homedir, cliBinP
 	case lib.FileExists(homeTOMLConfigFile):
 		cfg = readTOMLConfig(binPath, homedir)
 	}
-	binPath = cfg.BinPath
+	if cfg.BinPath != "" {
+		binPath = cfg.BinPath
+	}
 
 	if envBin := strings.TrimSpace(os.Getenv(envBinPath)); envBin != "" && cliBinPath == lib.ConvertExecutableExt(defaultBin) {
 		binPath = envBin

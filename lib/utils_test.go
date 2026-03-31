@@ -116,3 +116,32 @@ func TestPath(t *testing.T) {
 		t.Errorf("expected /usr/local/bin, got %q", p)
 	}
 }
+
+func TestIsInPath(t *testing.T) {
+	orig := os.Getenv("PATH")
+	defer os.Setenv("PATH", orig)
+
+	os.Setenv("PATH", "/usr/local/bin:/usr/bin:/home/user/bin")
+	if !IsInPath("/usr/local/bin") {
+		t.Error("expected /usr/local/bin to be in PATH")
+	}
+	if IsInPath("/nonexistent/bin") {
+		t.Error("expected /nonexistent/bin to not be in PATH")
+	}
+}
+
+func TestAcquireInstallLock(t *testing.T) {
+	release := AcquireInstallLock()
+
+	// Second acquisition should fail — but we can only verify the lock file exists.
+	lockPath := filepath.Join(os.TempDir(), installLockFile)
+	if _, err := os.Stat(lockPath); os.IsNotExist(err) {
+		t.Fatal("expected lock file to exist after AcquireInstallLock")
+	}
+
+	release()
+
+	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
+		t.Fatal("expected lock file to be removed after release")
+	}
+}

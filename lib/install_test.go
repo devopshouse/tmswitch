@@ -139,8 +139,14 @@ func TestInstallableBinLocation_FallbackToHomeBin(t *testing.T) {
 
 	// Create a dir, then make it non-writable.
 	noWriteDir := filepath.Join(tmpDir, "nowrite")
-	os.MkdirAll(noWriteDir, 0555)
-	defer os.Chmod(noWriteDir, 0755)
+	if err := os.MkdirAll(noWriteDir, 0555); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	defer func() {
+		if err := os.Chmod(noWriteDir, 0755); err != nil {
+			t.Logf("Warning: could not restore permissions on %s: %v", noWriteDir, err)
+		}
+	}()
 
 	binPath := filepath.Join(noWriteDir, "terramate")
 	got := InstallableBinLocation(binPath)
