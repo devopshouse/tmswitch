@@ -8,7 +8,11 @@ GOOS       ?= $(shell go env GOOS)
 GOARCH     ?= $(shell go env GOARCH)
 BUILD_DIR  := dist
 
-.PHONY: all build install test lint clean fmt vet tidy release help
+GOLANGCI_LINT_VERSION ?= latest
+GOLANGCI_LINT         := $(shell go env GOPATH)/bin/golangci-lint
+LINT_CONFIG           := .github/linters/.golangci.yml
+
+.PHONY: all build install test test-short fmt fmt-check vet lint check install-hooks tidy clean release help
 
 all: build
 
@@ -20,25 +24,52 @@ build:
 install:
 	go install $(LDFLAGS) .
 
-## test: run all tests
+## test: run all tests with verbose output
 test:
 	go test ./... -v -count=1
 
-## test-short: run tests without verbose output
+## test-short: run all tests (quiet)
 test-short:
 	go test ./...
 
-## fmt: format source code
+## fmt: format source code in place
 fmt:
 	gofmt -w .
 
+## fmt-check: verify formatting without modifying files (used in CI check)
+fmt-check:
+	@unformatted=$$(gofmt -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "The following files are not gofmt-formatted:"; \
+		echo "$$unformatted"; \
+		echo "Run 'make fmt' to fix."; \
+		exit 1; \
+	fi
+	@echo "✓ fmt"
+
 ## vet: run go vet
 vet:
-	go vet ./...
+	@go vet ./... && echo "✓ vet"
 
-## lint: run staticcheck (install with: go install honnef.co/go/tools/cmd/staticcheck@latest)
-lint:
-	staticcheck ./...
+## lint: run golangci-lint using the same config as CI (auto-installs if missing)
+lint: $(GOLANGCI_LINT)
+	$(GOLANGCI_LINT) run --config $(LINT_CONFIG) ./...
+	@echo "✓ lint"
+
+$(GOLANGCI_LINT):
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+## check: run all validations locally — mirrors CI (fmt, vet, test, lint)
+check: fmt-check vet test-short lint
+	@echo ""
+	@echo "✓ All checks passed."
+
+## install-hooks: install a git pre-commit hook that runs 'make check'
+install-hooks:
+	@printf '#!/bin/sh\nset -e\nmake check\n' > .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Pre-commit hook installed — 'make check' will run before every commit."
 
 ## tidy: tidy go.mod and go.sum
 tidy:

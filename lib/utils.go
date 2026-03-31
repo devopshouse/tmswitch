@@ -9,6 +9,8 @@ import (
 	"runtime"
 )
 
+const osWindows = "windows"
+
 // GetHomeDirectory returns the current user's home directory.
 func GetHomeDirectory() string {
 	home, err := os.UserHomeDir()
@@ -56,7 +58,7 @@ func CreateDirIfNotExist(path string) {
 
 // IsDirWritable returns true if the given directory is writable.
 func IsDirWritable(path string) bool {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		return false
 	}
 	tmpFile := filepath.Join(path, ".tmswitch_write_test")
@@ -159,7 +161,7 @@ func RetrieveFileContents(path string) string {
 
 // ConvertExecutableExt appends ".exe" on Windows if not already present.
 func ConvertExecutableExt(path string) string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		if filepath.Ext(path) != ".exe" {
 			return path + ".exe"
 		}

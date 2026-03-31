@@ -56,7 +56,7 @@ func TestGetVersionListFromURL(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if _, err := w.Write(body); err != nil {
+		if _, writeErr := w.Write(body); writeErr != nil {
 			return
 		}
 	}))

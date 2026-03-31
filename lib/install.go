@@ -86,13 +86,14 @@ func InstallWithOptions(version string, options InstallOptions) string {
 		fmt.Printf("Error downloading terramate v%s: %v\n", version, err)
 		os.Exit(1)
 	}
-	defer os.Remove(archivePath)
 
 	if err := extractBinary(archivePath, installBinaryName, versionedBin); err != nil {
+		os.Remove(archivePath)
 		release()
 		fmt.Printf("Error extracting terramate binary: %v\n", err)
 		os.Exit(1)
 	}
+	os.Remove(archivePath)
 
 	if err := os.Chmod(versionedBin, 0755); err != nil {
 		log.Printf("Warning: could not set executable bit on %s: %v", versionedBin, err)
@@ -155,7 +156,7 @@ func buildDownloadURL(version, downloadBaseURL, archOverride string) string {
 
 	arch := goarchToTerramate(goarch)
 	ext := "tar.gz"
-	if goos == "windows" {
+	if goos == osWindows {
 		ext = "zip"
 	}
 
