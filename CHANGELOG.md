@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/devopshouse/tmswitch/compare/v0.1.4...v0.1.5) (2026-04-17)
+
+
+### Bug Fixes
+
+* disable zizmor in super-linter ([#19](https://github.com/devopshouse/tmswitch/issues/19)) ([1a02bd8](https://github.com/devopshouse/tmswitch/commit/1a02bd877617abf51339ffa06be786582b6bf39e))
+
 ## [0.1.4](https://github.com/devopshouse/tmswitch/compare/v0.1.3...v0.1.4) (2026-03-31)
 
 
