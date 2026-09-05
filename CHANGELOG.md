@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/devopshouse/tmswitch/compare/v0.1.5...v0.1.6) (2026-09-05)
+
+
+### Bug Fixes
+
+* update vulnerable Go dependencies ([#32](https://github.com/devopshouse/tmswitch/issues/32)) ([496b42c](https://github.com/devopshouse/tmswitch/commit/496b42c47154b3b3a6156d94689aec06af202338))
+
 ## [0.1.5](https://github.com/devopshouse/tmswitch/compare/v0.1.4...v0.1.5) (2026-04-17)
 
 
