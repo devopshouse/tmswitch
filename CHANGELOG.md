@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/devopshouse/tmswitch/compare/v0.1.6...v0.1.7) (2026-10-30)
+
+
+### Bug Fixes
+
+* generate Homebrew cask without deprecated stanzas ([#54](https://github.com/devopshouse/tmswitch/issues/54)) ([b69e092](https://github.com/devopshouse/tmswitch/commit/b69e09260ada342a3573849cada109697364353d))
+* update golang.org/x/text to v0.41.0 ([#50](https://github.com/devopshouse/tmswitch/issues/50)) ([3db6b3c](https://github.com/devopshouse/tmswitch/commit/3db6b3ca91598c48f8e4547bf2a88f67d2a63583))
+
 ## [0.1.6](https://github.com/devopshouse/tmswitch/compare/v0.1.5...v0.1.6) (2026-09-05)
 
 
