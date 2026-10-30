@@ -83,11 +83,9 @@ homebrew_casks:
     homepage: https://github.com/devopshouse/tmswitch
     description: Switch between different versions of Terramate
     license: MIT
-    url:
-      verified: github.com/devopshouse/tmswitch/
     hooks:
       post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tmswitch"]
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/tmswitch"]
           end
